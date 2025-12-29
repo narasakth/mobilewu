@@ -1,5 +1,6 @@
 /**
- * App.js - Main Entry Point
+ * App.js - Acne Scan App Main Entry Point
+ * With Supabase Authentication
  */
 
 import React, { useState, useEffect } from 'react';
@@ -8,70 +9,138 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 
-// Database
-import { initDb } from './src/db/database';
+// Services
+import { getSession, onAuthStateChange } from './src/services/supabaseService';
 
 // Screens
+import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
-import AddReceiptScreen from './src/screens/AddReceiptScreen';
-import AddExpenseScreen from './src/screens/AddExpenseScreen';
-import AddIncomeScreen from './src/screens/AddIncomeScreen';
-import TransactionHistoryScreen from './src/screens/TransactionHistoryScreen';
-import EditExpenseScreen from './src/screens/EditExpenseScreen';
-import EditIncomeScreen from './src/screens/EditIncomeScreen';
+import FrontalCaptureScreen from './src/screens/FrontalCaptureScreen';
+import LeftProfileCaptureScreen from './src/screens/LeftProfileCaptureScreen';
+import RightProfileCaptureScreen from './src/screens/RightProfileCaptureScreen';
+import AnalysisResultScreen from './src/screens/AnalysisResultScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import HistoryDetailScreen from './src/screens/HistoryDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
-const LoadingScreen = () => (
-    <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3498db" />
-        <Text style={styles.loadingText}>กำลังเริ่มต้น...</Text>
-    </View>
+// Auth Stack (not logged in)
+const AuthStack = () => (
+    <Stack.Navigator
+        screenOptions={{
+            headerShown: false,
+            animation: 'fade',
+        }}
+    >
+        <Stack.Screen name="Login" component={LoginScreen} />
+    </Stack.Navigator>
+);
+
+// Main Stack (logged in)
+const MainStack = () => (
+    <Stack.Navigator
+        screenOptions={{
+            headerShown: false,
+            animation: 'fade',
+        }}
+    >
+        <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{ animation: 'fade' }}
+        />
+        <Stack.Screen
+            name="FrontalCapture"
+            component={FrontalCaptureScreen}
+            options={{ animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+            name="LeftProfileCapture"
+            component={LeftProfileCaptureScreen}
+            options={{ animation: 'fade' }}
+        />
+        <Stack.Screen
+            name="RightProfileCapture"
+            component={RightProfileCaptureScreen}
+            options={{ animation: 'fade' }}
+        />
+        <Stack.Screen
+            name="AnalysisResult"
+            component={AnalysisResultScreen}
+            options={{ animation: 'fade' }}
+        />
+        <Stack.Screen
+            name="History"
+            component={HistoryScreen}
+            options={{ animation: 'fade' }}
+        />
+        <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ animation: 'fade' }}
+        />
+        <Stack.Screen
+            name="HistoryDetail"
+            component={HistoryDetailScreen}
+            options={{ animation: 'slide_from_right' }}
+        />
+    </Stack.Navigator>
 );
 
 export default function App() {
-    const [isDbReady, setIsDbReady] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [session, setSession] = useState(null);
 
     useEffect(() => {
-        const initializeApp = async () => {
-            try {
-                await initDb();
-                console.log('App initialized successfully');
-            } catch (error) {
-                console.error('Error initializing app:', error);
-            } finally {
-                setIsDbReady(true);
-            }
+        // Check initial session
+        const checkSession = async () => {
+            const currentSession = await getSession();
+            setSession(currentSession);
+            setIsLoading(false);
         };
-        initializeApp();
+
+        checkSession();
+
+        // Listen for auth changes
+        const { data: { subscription } } = onAuthStateChange((event, newSession) => {
+            console.log('Auth event:', event);
+            setSession(newSession);
+        });
+
+        return () => {
+            subscription?.unsubscribe();
+        };
     }, []);
 
-    if (!isDbReady) return <LoadingScreen />;
+    // Loading screen
+    if (isLoading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#0066CC" />
+                <Text style={styles.loadingText}>กำลังโหลด...</Text>
+            </View>
+        );
+    }
 
     return (
         <NavigationContainer>
-            <StatusBar style="light" />
-            <Stack.Navigator
-                initialRouteName="Home"
-                screenOptions={{
-                    headerStyle: { backgroundColor: '#3498db' },
-                    headerTintColor: '#fff',
-                    headerTitleStyle: { fontWeight: 'bold' },
-                }}
-            >
-                <Stack.Screen name="Home" component={HomeScreen} options={{ title: '💰 MobileWU' }} />
-                <Stack.Screen name="AddReceipt" component={AddReceiptScreen} options={{ title: 'เพิ่มใบเสร็จ' }} />
-                <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ title: 'บันทึกรายจ่าย', headerStyle: { backgroundColor: '#e74c3c' } }} />
-                <Stack.Screen name="AddIncome" component={AddIncomeScreen} options={{ title: 'บันทึกรายรับ', headerStyle: { backgroundColor: '#27ae60' } }} />
-                <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} options={{ title: 'ประวัติการเคลื่อนไหว' }} />
-                <Stack.Screen name="EditExpense" component={EditExpenseScreen} options={{ title: 'แก้ไขรายจ่าย', headerStyle: { backgroundColor: '#e74c3c' } }} />
-                <Stack.Screen name="EditIncome" component={EditIncomeScreen} options={{ title: 'แก้ไขรายรับ', headerStyle: { backgroundColor: '#27ae60' } }} />
-            </Stack.Navigator>
+            <StatusBar style="auto" />
+            {session ? <MainStack /> : <AuthStack />}
         </NavigationContainer>
     );
 }
 
 const styles = StyleSheet.create({
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' },
-    loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: '#64748B',
+    },
 });
